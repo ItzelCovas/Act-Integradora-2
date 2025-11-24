@@ -70,14 +70,7 @@ def preOrder(root, ans, curr):
 
 
 def huffmanCodes(s, freq):
-    """
-    Construye el árbol de Huffman a partir de:
-    - s: lista de caracteres
-    - freq: lista de frecuencias (mismo orden que s)
-    Devuelve:
-    - codes_dic: diccionario {caracter: codigo_binario_str}
-    - root: raíz del árbol de Huffman
-    """
+    # Code here
     n = len(s)
 
     # Min heap for node class.
@@ -106,29 +99,18 @@ def huffmanCodes(s, freq):
     return codes_dic, root
 
 
+
 # FRECUENCIAS Y PROMEDIO DE BITS
 
 
 def compute_frequencies_from_text(text):
-    """
-    Recibe un string completo y devuelve:
-    - lista de caracteres únicos (chars)
-    - lista de frecuencias (freqs), alineada con chars
-    - contador completo (Counter) por si lo queremos usar después
-    """
     counter = Counter(text)
-    # Quitamos posibles caracteres con frecuencia 0
     chars = list(counter.keys())
     freqs = [counter[c] for c in chars]
     return chars, freqs, counter
 
 
 def compute_frequencies_from_file(path):
-    """
-    Lee un archivo de texto (UTF-8) y regresa:
-    - chars, freqs, counter
-    - el texto completo (por si lo queremos usar)
-    """
     p = Path(path)
     text = p.read_text(encoding="utf-8")
     chars, freqs, counter = compute_frequencies_from_text(text)
@@ -136,11 +118,6 @@ def compute_frequencies_from_file(path):
 
 
 def average_bits_per_symbol(codes_dic, freq_counter):
-    """
-    Calcula el número promedio de bits por símbolo:
-    E[L] = sum( p(c) * len(code(c)) ) sobre todos los caracteres c
-    donde p(c) = freq(c) / total_simbolos
-    """
     total_symbols = sum(freq_counter.values())
     if total_symbols == 0:
         return 0.0
@@ -154,10 +131,45 @@ def average_bits_per_symbol(codes_dic, freq_counter):
     return expected_len
 
 
+
+# VISUALIZACIÓN DEL ÁRBOL CON GRAPHVIZ
+
+
+def visualize_huffman_tree(root, output_path="huffman_tree"):
+    from graphviz import Digraph
+
+    dot = Digraph(comment="Huffman Tree")
+
+    def add_nodes_edges(node, node_id):
+        if node.char:
+            label = f"{repr(node.char)}\\n{node.data}"
+        else:
+            label = str(node.data)
+
+        dot.node(node_id, label)
+
+        if node.left:
+            left_id = node_id + "0"
+            add_nodes_edges(node.left, left_id)
+            dot.edge(node_id, left_id, label="0")
+
+        if node.right:
+            right_id = node_id + "1"
+            add_nodes_edges(node.right, right_id)
+            dot.edge(node_id, right_id, label="1")
+
+    add_nodes_edges(root, "R")
+    output_file = dot.render(output_path, format="png", cleanup=True)
+    print(f"✅ Árbol de Huffman guardado en: {output_file}")
+
+
+
+# MAIN
+
+
 if __name__ == "__main__":
     import sys
 
-    # Si no se pasa archivo, usamos el ejemplo de la clase
     if len(sys.argv) == 1:
         print("Modo ejemplo (sin archivo de texto):")
         s = ["a","b","c","d","e","f"]
@@ -166,8 +178,9 @@ if __name__ == "__main__":
         print(root)
 
         codes_dic = dict(sorted(codes_dic.items()))
+
         for c in codes_dic:
-            print(f"{c} = {codes_dic[c]}")
+            print(f"{c}={codes_dic[c]}")
     else:
         filename = sys.argv[1]
         print(f"Procesando archivo: {filename}")
@@ -179,7 +192,6 @@ if __name__ == "__main__":
 
         codes_dic, root = huffmanCodes(chars, freqs)
 
-        # Ordenamos el diccionario por carácter para verlo bonito
         codes_dic_sorted = dict(sorted(codes_dic.items(), key=lambda x: x[0]))
 
         print("\nÁrbol de Huffman:")
@@ -187,11 +199,11 @@ if __name__ == "__main__":
 
         print("Códigos de Huffman por carácter:")
         for c, code in codes_dic_sorted.items():
-            # Mostramos repr(c) para ver espacios, saltos de línea, etc.
             print(f"{repr(c)} -> {code}")
 
         avg_bits = average_bits_per_symbol(codes_dic, counter)
         print(f"\nNúmero promedio de bits por símbolo: {avg_bits:.4f}")
         
-        
-
+        # Visualizacion del arbol
+        output_name = f"graph_{Path(filename).stem}"
+        visualize_huffman_tree(root, output_path=output_name)
