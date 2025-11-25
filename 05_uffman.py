@@ -158,8 +158,6 @@ def compress_file(input_path, output_path):
     if padding > 0:
         compressed_bits.extend('0' * padding)
         
-    
-
     # Header que se guardará con pickle
     header = {
         'codes_dic': codes_dic,  # códigos como strings
@@ -181,6 +179,103 @@ def compress_file(input_path, output_path):
     print(f"Tamaño original   : {original_size_bytes} bytes")
     print(f"Tamaño comprimido : {compressed_size_bytes} bytes")
     print(f"Padding (bits)    : {padding}")
+
+
+# DESCOMPRESIÓN USANDO DICCIONARIO INVERSO
+
+def decompress_file_with_dict(input_path, output_path):
+    import pickle
+    from bitarray import bitarray
+
+    # Leer header y bytes comprimidos
+    with open(input_path, 'rb') as f:
+        header = pickle.load(f)
+        compressed_bytes = f.read()
+
+    codes_dic = header['codes_dic']
+    padding = header['padding']
+
+    # Reconstruir bitarray completo
+    bits = bitarray()
+    bits.frombytes(compressed_bytes)
+
+    # Quitar padding
+    if padding > 0:
+        bits = bits[:-padding]
+
+    # Diccionario inverso: código (str) -> carácter
+    inverse_codes = {code_str: ch for ch, code_str in codes_dic.items()}
+
+    decoded_chars = []
+    current_code = ""
+
+    for bit in bits.to01():
+        current_code += bit
+        if current_code in inverse_codes:
+            decoded_chars.append(inverse_codes[current_code])
+            current_code = ""
+
+    if current_code != "":
+        print("⚠️ Advertencia: quedaron bits sin decodificar:", current_code)
+
+    text = ''.join(decoded_chars)
+    Path(output_path).write_text(text, encoding="utf-8")
+
+    compressed_size_bytes = Path(input_path).stat().st_size
+    restored_size_bytes = Path(output_path).stat().st_size
+
+    print(f"Archivo .huff        : {input_path}")
+    print(f"Archivo reconstruido : {output_path}")
+    print(f"Tamaño .huff         : {compressed_size_bytes} bytes")
+    print(f"Tamaño reconstruido  : {restored_size_bytes} bytes")
+
+
+# DESCOMPRESIÓN USANDO EL ÁRBOL DE HUFFMAN
+
+def decompress_file_with_tree(input_path, output_path):
+    import pickle
+    from bitarray import bitarray
+
+    # Leer header y bytes comprimidos
+    with open(input_path, 'rb') as f:
+        header = pickle.load(f)
+        compressed_bytes = f.read()
+
+    padding = header['padding']
+    root = header['root']
+
+    # Reconstruir bitarray completo
+    bits = bitarray()
+    bits.frombytes(compressed_bytes)
+
+    # Quitar padding
+    if padding > 0:
+        bits = bits[:-padding]
+
+    decoded_chars = []
+    node = root
+
+    for bit in bits.to01():
+        if bit == '0':
+            node = node.left
+        else:
+            node = node.right
+
+        # Si es hoja
+        if node.left is None and node.right is None:
+            decoded_chars.append(node.char)
+            node = root
+
+    text = ''.join(decoded_chars)
+    Path(output_path).write_text(text, encoding="utf-8")
+
+    compressed_size_bytes = Path(input_path).stat().st_size
+    restored_size_bytes = Path(output_path).stat().st_size
+
+    print(f"Archivo .huff        : {input_path}")
+    print(f"Archivo reconstruido : {output_path}")
+    print(f"Tamaño .huff         : {compressed_size_bytes} bytes")
+    print(f"Tamaño reconstruido  : {restored_size_bytes} bytes")
 
 
 # VISUALIZACIÓN DEL ÁRBOL CON GRAPHVIZ
@@ -245,6 +340,26 @@ if __name__ == "__main__":
             output_path = str(Path(input_path).with_suffix(".huff"))
 
         compress_file(input_path, output_path)
+
+    elif sys.argv[1] == "decompress_dict":
+        # Uso: python 05_uffman.py decompress_dict input.huff salida.txt
+        if len(sys.argv) < 4:
+            print("Uso: python 05_uffman.py decompress_dict input.huff salida.txt")
+            sys.exit(1)
+
+        input_huff = sys.argv[2]
+        output_txt = sys.argv[3]
+        decompress_file_with_dict(input_huff, output_txt)
+
+    elif sys.argv[1] == "decompress_tree":
+        # Uso: python 05_uffman.py decompress_tree input.huff salida.txt
+        if len(sys.argv) < 4:
+            print("Uso: python 05_uffman.py decompress_tree input.huff salida.txt")
+            sys.exit(1)
+
+        input_huff = sys.argv[2]
+        output_txt = sys.argv[3]
+        decompress_file_with_tree(input_huff, output_txt)
 
     else:
         # Modo análisis de archivo: python 05_uffman.py archivo.txt
