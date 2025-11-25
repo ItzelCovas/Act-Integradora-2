@@ -131,9 +131,59 @@ def average_bits_per_symbol(codes_dic, freq_counter):
     return expected_len
 
 
+# COMPRESIÓN A .huff
+
+def compress_file(input_path, output_path):
+    import pickle
+    from bitarray import bitarray
+
+    # Leer archivo y construir frecuencias
+    chars, freqs, counter, text = compute_frequencies_from_file(input_path)
+
+    # Construir árbol de Huffman y códigos (string)
+    codes_dic, root = huffmanCodes(chars, freqs)
+
+    # Construir diccionario de códigos en bitarray
+    codes_bits = {}
+    for c, code_str in codes_dic.items():
+        codes_bits[c] = bitarray(code_str)
+
+    # Construir el flujo de bits comprimidos
+    compressed_bits = bitarray()
+    for ch in text:
+        compressed_bits.extend(codes_bits[ch])
+
+    # Calcular padding (relleno para completar el último byte)
+    padding = (8 - (len(compressed_bits) % 8)) % 8
+    if padding > 0:
+        compressed_bits.extend('0' * padding)
+        
+    
+
+    # Header que se guardará con pickle
+    header = {
+        'codes_dic': codes_dic,  # códigos como strings
+        'padding': padding,      # número de bits de relleno al final
+        'root': root             # árbol de Huffman para decodificación por árbol
+    }
+
+    # Escribir archivo .huff: primero header (pickle), luego bits comprimidos
+    with open(output_path, 'wb') as f:
+        pickle.dump(header, f)
+        f.write(compressed_bits.tobytes())
+
+    # Info útil en consola
+    original_size_bytes = Path(input_path).stat().st_size
+    compressed_size_bytes = Path(output_path).stat().st_size
+
+    print(f"Archivo original : {input_path}")
+    print(f"Archivo .huff     : {output_path}")
+    print(f"Tamaño original   : {original_size_bytes} bytes")
+    print(f"Tamaño comprimido : {compressed_size_bytes} bytes")
+    print(f"Padding (bits)    : {padding}")
+
 
 # VISUALIZACIÓN DEL ÁRBOL CON GRAPHVIZ
-
 
 def visualize_huffman_tree(root, output_path="huffman_tree"):
     from graphviz import Digraph
@@ -166,7 +216,6 @@ def visualize_huffman_tree(root, output_path="huffman_tree"):
 
 # MAIN
 
-
 if __name__ == "__main__":
     import sys
 
@@ -181,7 +230,24 @@ if __name__ == "__main__":
 
         for c in codes_dic:
             print(f"{c}={codes_dic[c]}")
+
+    elif sys.argv[1] == "compress":
+        # Uso: python 05_uffman.py compress input.txt [output.huff]
+        if len(sys.argv) < 3:
+            print("Uso: python 05_uffman.py compress input.txt [output.huff]")
+            sys.exit(1)
+
+        input_path = sys.argv[2]
+        if len(sys.argv) >= 4:
+            output_path = sys.argv[3]
+        else:
+            # mismo nombre pero extensión .huff
+            output_path = str(Path(input_path).with_suffix(".huff"))
+
+        compress_file(input_path, output_path)
+
     else:
+        # Modo análisis de archivo: python 05_uffman.py archivo.txt
         filename = sys.argv[1]
         print(f"Procesando archivo: {filename}")
 
@@ -203,7 +269,15 @@ if __name__ == "__main__":
 
         avg_bits = average_bits_per_symbol(codes_dic, counter)
         print(f"\nNúmero promedio de bits por símbolo: {avg_bits:.4f}")
-        
-        # Visualizacion del arbol
-        output_name = f"graph_{Path(filename).stem}"
+
+        total_symbols = sum(counter.values())
+        total_bits = 0
+        for c, freq in counter.items():
+            total_bits += freq * len(codes_dic[c])
+
+        print("\n=== Verificación manual ===")
+        print(f"Total de bits generados: {total_bits}")
+        print(f"Promedio bits/símbolo (manual) = {total_bits / total_symbols:.4f}")
+
+        output_name = f"huffman_{Path(filename).stem}"
         visualize_huffman_tree(root, output_path=output_name)
